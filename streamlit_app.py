@@ -11,15 +11,15 @@ from streamlit_folium import st_folium
 def load_data():
     # Excel 里可能有换行符，先统一去掉
     usage = pd.read_excel(
-        'Capstone 2025 Project- Utility Data copy.xlsx'
+        'data/Capstone 2025 Project- Utility Data copy.xlsx'
     )
     usage.columns = usage.columns.str.replace('\n', '', regex=True)
 
     building = pd.read_excel(
-        'UCSD Building CAAN Info.xlsx'
+        'data/UCSD Building CAAN Info.xlsx'
     )
     coords = pd.read_csv(
-        'ucsd_building_coordinates.csv'
+        'data/ucsd_building_coordinates.csv'
     )
     return usage, building, coords
 
