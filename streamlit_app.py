@@ -161,7 +161,7 @@ else:
 
     # 8. 页面输出
     st.header("Interactive Heatmap")
-    st_folium(m, width=1000, height=800)
+    st_folium(m, width=800, height=800)
 
     st.header("Monthly Mean Usage per Building")
     st.dataframe(monthly_mean)
