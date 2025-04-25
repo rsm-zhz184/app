@@ -99,20 +99,23 @@ for _, r in df.dropna(subset=["Latitude","Longitude",col]).iterrows():
 
     href = (
         f"/?page=building_detail"
-        f"&building={r['Building'].replace(' ','%20')}"
-        f"&utility={utility.replace(' ','%20')}"
+        f"&building={r['Building'].replace(' ', '%20')}"
+        f"&utility={utility.replace(' ', '%20')}"
     )
+
     html = f"""
-    <div style='font-size:14px;text-align:center;padding:6px;'>
+    <div style='font-size:14px; text-align:center; padding:6px;'>
       <b>{r['Building']}</b><br>
       🏷️ <i>{r['Building Classification']}</i><br><br>
       📊 {txt}<br>
       📈 Avg Monthly: <b>{mon}</b><br><br>
-      <a href="{href}" target="_top">View Details →</a>
+      <!-- 关键改动：target="_parent" -->
+      <a href="{href}" target="_parent">View Details →</a>
     </div>
     """
+
     folium.CircleMarker(
-        location=[r["Latitude"],r["Longitude"]],
+        location=[r["Latitude"], r["Longitude"]],
         radius=6,
         color="black",
         fill=True,
