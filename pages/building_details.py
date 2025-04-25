@@ -7,7 +7,7 @@ import altair as alt
 st.set_page_config(page_title="Building Detail", page_icon="🏢")
 
 # 1. 从 URL 参数里拿 building name
-params = st.experimental_get_query_params()
+params = st.query_params
 bld = params.get("name", [""])[0]
 
 st.title(f"🏢 {bld} Utility Distribution")
