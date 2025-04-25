@@ -80,7 +80,7 @@ if classification != "All":
 
 # If no data after filtering, stop
 if df.empty:
-    st.error(f"❌ 当前分类 “{classification}” 下没有任何数据。")
+    st.error(f"❌ Current “{classification}” has no data")
     st.stop()
 
 # 6. Compute monthly totals & mean
