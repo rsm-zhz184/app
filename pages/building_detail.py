@@ -6,7 +6,7 @@ st.set_page_config(page_title="Building Detail", layout="centered")
 st.title("🏢 Building Detail")
 
 # 1. 读取URL参数
-params  = st.experimental_get_query_params()
+params  = st.query_params
 name    = params.get("building", [""])[0]
 utility = params.get("utility", ["Electrical"])[0]
 classification = params.get("classification", ["All"])[0]
