@@ -97,11 +97,14 @@ for _, r in df.dropna(subset=["Latitude","Longitude",col]).iterrows():
         color, txt = "green",  f"Low ✅ ({label}={v:.2f})"
     mon = f"{r['Monthly_Mean']:.2f}" if pd.notna(r['Monthly_Mean']) else "N/A"
 
+    # … 在你 for 循环里，算出 color, txt, mon 等之后 …
+
+    # 构造要跳转的 URL，一定要带上 '?page=building_detail'
     href = (
-        f"/?page=building_detail"
-        f"&building={r['Building'].replace(' ', '%20')}"
-        f"&utility={utility.replace(' ', '%20')}"
-    )
+    f"/?page=building_detail"
+    f"&building={r['Building'].replace(' ','%20')}"
+    f"&utility={utility.replace(' ','%20')}"
+)
 
     html = f"""
     <div style='font-size:14px; text-align:center; padding:6px;'>
@@ -109,19 +112,17 @@ for _, r in df.dropna(subset=["Latitude","Longitude",col]).iterrows():
       🏷️ <i>{r['Building Classification']}</i><br><br>
       📊 {txt}<br>
       📈 Avg Monthly: <b>{mon}</b><br><br>
-      <!-- 关键改动：target="_parent" -->
-      <a href="{href}" target="_parent">View Details →</a>
+      <a href="{href}" target="_blank" rel="noopener noreferrer">View Details →</a>
     </div>
     """
 
     folium.CircleMarker(
         location=[r["Latitude"], r["Longitude"]],
-        radius=6,
-        color="black",
-        fill=True,
-        fill_color=color,
+        radius=6, color="black",
+        fill=True, fill_color=color,
         fill_opacity=0.85,
         popup=Popup(html, max_width=300)
     ).add_to(m)
 
-st_folium(m, width=800, height=500)
+
+st_folium(m, width=800, height=600)
