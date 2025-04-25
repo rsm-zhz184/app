@@ -143,7 +143,6 @@ for _, r in df_valid.iterrows():
 # ——  **关键**：只调用一次 st_folium，并接收返回值 —— 
 map_data = st_folium(m, width=900, height=500, returned_objects=["last_clicked"])
 
-# 8) 底部显示月均表格
 st.header("🏷️ Monthly Mean Usage per Building")
 st.dataframe(
     monthly_mean
@@ -153,10 +152,31 @@ st.dataframe(
     use_container_width=True
 )
 
-# 9) （可选）响应点击事件
-if map_data and map_data.get("last_clicked"):
-    lat, lng = map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"]
-    df_valid["dist2"] = (df_valid["Latitude"]-lat)**2 + (df_valid["Longitude"]-lng)**2
-    idx = df_valid["dist2"].idxmin()
-    bld = df_valid.loc[idx, "Building"]
-    st.sidebar.success(f"🔍 最近点击的是：{bld}")
+# 9. 如果用户在地图上点击了某个建筑，就在表格下面展示该楼的详细趋势
+click = map_data.get("last_clicked") if map_data else None
+if click:
+    lat, lng = click["lat"], click["lng"]
+    # 找到点最接近的那一行
+    dfv["dist2"] = (dfv["Latitude"]-lat)**2 + (dfv["Longitude"]-lng)**2
+    idx = dfv["dist2"].idxmin()
+    bld = dfv.loc[idx, "Building"]
+
+    st.markdown("---")
+    st.markdown(f"## 🏢 Detail for **{bld}**")
+
+    # 从 mon（全量月度表）里筛出这个 building + 当前 utility
+    df_month = (
+        mon
+        .query("CommodityCode == @commodity_map[utility]")
+        .query("Building == @bld")
+        .set_index("Month")["Monthly_Total"]
+    )
+
+    # 1) 月度用量折线图
+    st.subheader("📈 Monthly Usage Trend")
+    st.line_chart(df_month, use_container_width=True)
+
+    # 2) 年度用量直方图（按年汇总后做柱状）
+    yearly = df_month.groupby(df_month.index.year).sum()
+    st.subheader("📊 Yearly Usage Totals")
+    st.bar_chart(yearly, use_container_width=True)
