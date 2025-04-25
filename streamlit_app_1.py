@@ -164,4 +164,4 @@ else:
     st_folium(m, width=800, height=800)
 
     st.header("Monthly Mean Usage per Building")
-    st.dataframe(monthly_mean) 我需要的是在html的页面里在加上一个html，可以转到具体的当前选中的building的utility的数据分布（点状图或柱状图），
+    st.dataframe(monthly_mean)
