@@ -10,33 +10,30 @@ from pathlib import Path
 # ─── 1. 载入并缓存数据 ─────────────────────────────────
 @st.cache_data
 def load_data():
-    base = Path("data")
+    # 1) 先读 usage
+    usage = pd.read_excel("data/Capstone 2025 Project- Utility Data copy.xlsx")
+    usage.columns = usage.columns.str.replace("\n", "", regex=True)
 
-    # 1.1 用量表
-    usage = pd.read_excel(base / "Capstone 2025 Project- Utility Data copy.xlsx")
-    # 先去掉所有列名里的换行和首尾空白
-    usage.columns = usage.columns.str.replace("\n", "", regex=True).str.strip()
-    # 如果有 “Building Name” 就重命名
-    if "Building Name" in usage.columns:
-        usage = usage.rename(columns={"Building Name": "Building"})
-    # 确保日期列是 datetime
-    usage["EndDate"] = pd.to_datetime(usage["EndDate"])
+    # 2) 读 buildings & coords
+    building = pd.read_excel("data/UCSD Building CAAN Info.xlsx")
+    coords   = pd.read_csv("data/ucsd_building_coordinates.csv")
 
-    # 1.2 建筑信息表
-    building = pd.read_excel(base / "UCSD Building CAAN Info.xlsx")
-    building.columns = building.columns.str.strip()
+    # 3) **关键：把 usage 跟 building_info 先合一下，给 usage 挂上 Building 列**
+    usage = usage.merge(
+        building[['Building Capital Asset Account Number','Building']],
+        left_on='CAAN',
+        right_on='Building Capital Asset Account Number',
+        how='left'
+    )
 
-    # 1.3 坐标表
-    coords = pd.read_csv(base / "ucsd_building_coordinates.csv")
-    coords.columns = coords.columns.str.strip()
-
-    # 1.4 预算 月度用量 (Monthly_Total)
+    # 4) 再做 monthly 预计算
+    usage['EndDate'] = pd.to_datetime(usage['EndDate'])
     mon = (
         usage
-        .assign(Month=usage["EndDate"].dt.to_period("M"))
-        .groupby(["Building", "CommodityCode", "Month"], dropna=False)["Use"]
+        .assign(Month=usage['EndDate'].dt.to_period('M'))
+        .groupby(['Building','CommodityCode','Month'], dropna=False)['Use']
         .sum()
-        .reset_index(name="Monthly_Total")
+        .reset_index(name='Monthly_Total')
     )
 
     return usage, building, coords, mon
