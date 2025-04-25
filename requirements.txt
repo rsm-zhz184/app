@@ -3,3 +3,4 @@ pandas
 openpyxl        # 读写 Excel
 folium
 streamlit-folium
+altair
