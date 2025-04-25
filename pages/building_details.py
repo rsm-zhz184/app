@@ -2,65 +2,53 @@
 
 import streamlit as st
 import pandas as pd
-import altair as alt
+from pathlib import Path
 
-st.set_page_config(page_title="Building Detail", page_icon="🏢")
+st.set_page_config(page_title="Building Detail", layout="centered")
+st.title("🏢 Building Detail")
 
-# 1. 从 URL 参数里拿 building name
+# ✅ 用 st.query_params 而不是 experimental
 params = st.query_params
-bld = params.get("name", [""])[0]
+name    = params.get("building", [""])[0]
+utility = params.get("utility", ["Electrical"])[0]
 
-st.title(f"🏢 {bld} Utility Distribution")
-
-# 2. 读入原始 utility 用量数据
-@st.cache_data
-def load_usage():
-    df = pd.read_excel("data/Capstone 2025 Project- Utility Data copy.xlsx")
-    df.columns = df.columns.str.replace('\n', '', regex=True)
-    df["EndDate"] = pd.to_datetime(df["EndDate"])
-    return df
-
-usage = load_usage()
-
-# 3. 给用户选一个 CommodityCode（可选：Electrical/Gas/…）
-comm_map = {
-    "Electrical": "ELECTRIC",
-    "Gas":        "NATURALGAS",
-    "Hot Water":  "HOTWATER",
-    "Solar PV":   "SOLARPV",
-    "ReClaimed Water": "RECLAIMEDWATER",
-    "Chilled Water":   "CHILLEDWATER"
-}
-choice = st.selectbox("Utility Type", list(comm_map.keys()))
-code = comm_map[choice]
-
-# 4. 过滤数据
-df = usage[
-    (usage["Building"] == bld) &
-    (usage["CommodityCode"] == code)
-].copy()
-
-if df.empty:
-    st.warning("No records for this building + utility.")
+if not name:
+    st.info("➡️ Please click a building on the main heatmap first.")
     st.stop()
 
-# 5. 聚合成月度或年度
-gran = st.radio("Time granularity", ["Month","Year"])
-if gran == "Month":
-    df["Period"] = df["EndDate"].dt.to_period("M").dt.to_timestamp()
-else:
-    df["Period"] = df["EndDate"].dt.year
+# 重新加载数据
+base = Path("data")
+usage    = pd.read_excel(base / "Capstone 2025 Project- Utility Data copy.xlsx")
+usage.columns = usage.columns.str.replace("\n", "", regex=True)
+usage["EndDate"] = pd.to_datetime(usage["EndDate"])
+building = pd.read_excel(base / "UCSD Building CAAN Info.xlsx")
 
-agg = df.groupby("Period")["Use"].sum().reset_index(name="Total Use")
+# 显示建筑信息
+st.header(name)
+cls = building.loc[building["Building"] == name, "Building Classification"].iloc[0]
+st.markdown(f"**Classification:** _{cls}_")
 
-# 6. 绘图
-chart = alt.Chart(agg).mark_bar().encode(
-    x=alt.X("Period:T" if gran=="Month" else "Period:O", title=gran),
-    y=alt.Y("Total Use:Q", title="Total Use"),
-    tooltip=["Period", "Total Use"]
-).properties(width=700, height=400)
+# 过滤并绘图
+commodity_map = {
+    "Electrical":"ELECTRIC","Gas":"NATURALGAS","Hot Water":"HOTWATER",
+    "Solar PV":"SOLARPV","ReClaimed Water":"RECLAIMEDWATER","Chilled Water":"CHILLEDWATER"
+}
 
-st.altair_chart(chart, use_container_width=True)
+df = usage[
+    (usage["Building"] == name) &
+    (usage["CommodityCode"] == commodity_map[utility])
+].copy()
+if df.empty:
+    st.warning("No data for this building & utility.")
+    st.stop()
 
-# 7. 返回主页
-st.markdown("[← Back to Map](../streamlit_app)")
+df["Month"] = df["EndDate"].dt.to_period("M").dt.to_timestamp()
+monthly = df.groupby("Month")["Use"].sum().reset_index()
+
+st.subheader("Monthly Usage Trend")
+st.line_chart(monthly.set_index("Month")["Use"], use_container_width=True)
+
+st.subheader("Yearly Usage Totals")
+df["Year"] = df["EndDate"].dt.year
+yearly = df.groupby("Year")["Use"].sum().reset_index()
+st.bar_chart(yearly.set_index("Year")["Use"], use_container_width=True)
