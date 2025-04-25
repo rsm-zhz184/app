@@ -97,26 +97,26 @@ for _, r in df.dropna(subset=["Latitude","Longitude",col]).iterrows():
         color, txt = "green",  f"Low ✅ ({label}={v:.2f})"
     mon = f"{r['Monthly_Mean']:.2f}" if pd.notna(r['Monthly_Mean']) else "N/A"
 
-    # **关键：跳转到 building_detail 页，一定要带 ?page=building_detail**
     href = (
         f"/?page=building_detail"
         f"&building={r['Building'].replace(' ','%20')}"
         f"&utility={utility.replace(' ','%20')}"
     )
-
     html = f"""
     <div style='font-size:14px;text-align:center;padding:6px;'>
       <b>{r['Building']}</b><br>
       🏷️ <i>{r['Building Classification']}</i><br><br>
       📊 {txt}<br>
       📈 Avg Monthly: <b>{mon}</b><br><br>
-      <a href="{href}" target="_self">View Details →</a>
-    </div>"""
-
+      <a href="{href}" target="_top">View Details →</a>
+    </div>
+    """
     folium.CircleMarker(
         location=[r["Latitude"],r["Longitude"]],
-        radius=6, color="black",
-        fill=True, fill_color=color,
+        radius=6,
+        color="black",
+        fill=True,
+        fill_color=color,
         fill_opacity=0.85,
         popup=Popup(html, max_width=300)
     ).add_to(m)
