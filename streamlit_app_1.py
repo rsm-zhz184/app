@@ -109,28 +109,38 @@ else:
 # ─────────────────────────────────────────────────────────────────────────────
 # 7. 渲染 Folium 地图
 # ─────────────────────────────────────────────────────────────────────────────
+# 7. 渲染 Folium 地图
 st.markdown("## 📍 Campus Heatmap")
-center = [df["Latitude"].mean(), df["Longitude"].mean()]
-m = folium.Map(location=center, zoom_start=15)
-for _, r in df.dropna(subset=["Latitude","Longitude",col]).iterrows():
-    v = r[col]
-    color = "red"    if v>high else \
-            "orange" if v>low  else \
-            "green"
-    txt = f"{v:.2f}"
-    mon_str = f"{r['Monthly_Mean']:.0f}" if pd.notna(r["Monthly_Mean"]) else "N/A"
-    popup = Popup(f"""
-        <b>{r['Building']}</b><br>
-        <i>{r['Building Classification']}</i><br>
-        {cmp_mode}: <b style='color:{color}'>{txt}</b><br>
-        Avg monthly: <b>{mon_str}</b>
-        """, max_width=250)
-    folium.CircleMarker(
-        location=[r["Latitude"],r["Longitude"]],
-        radius=6, color="black",
-        fill=True, fill_color=color,
-        fill_opacity=0.8, popup=popup
-    ).add_to(m)
+
+# 只保留有坐标的行
+df_valid = df.dropna(subset=["Latitude","Longitude"])
+if df_valid.empty:
+    st.warning("✅ 这个分类下没有任何带坐标的建筑，无法显示热力图。")
+else:
+    center = [ df_valid["Latitude"].mean(), df_valid["Longitude"].mean() ]
+    m = folium.Map(location=center, zoom_start=15)
+
+    for _, r in df_valid.iterrows():
+        v = r[col]
+        color = "red"    if v>high else \
+                "orange" if v>low  else \
+                "green"
+        txt = f"{v:.2f}"
+        mon_str = f"{r['Monthly_Mean']:.0f}" if pd.notna(r["Monthly_Mean"]) else "N/A"
+        popup = Popup(f"""
+            <b>{r['Building']}</b><br>
+            <i>{r['Building Classification']}</i><br>
+            {cmp_mode}: <b style='color:{color}'>{txt}</b><br>
+            Avg monthly: <b>{mon_str}</b>
+            """, max_width=250)
+        folium.CircleMarker(
+            location=[r["Latitude"],r["Longitude"]],
+            radius=6, color="black",
+            fill=True, fill_color=color,
+            fill_opacity=0.8, popup=popup
+        ).add_to(m)
+
+    st_folium(m, width=800, height=450)
 
 map_data = st_folium(m, width=800, height=450)
 
