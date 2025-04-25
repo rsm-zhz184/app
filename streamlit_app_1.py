@@ -115,9 +115,9 @@ df = df.merge(monthly_mean, on='Building', how='left')
 
 # 6. Folium 地图配色参数
 if compare_mode == "Self":
-    col, low, high, label = 'Use_CV', 0.3, 0.6, 'CV'
+    col, low, high, label = 'Use_CV', 0.3, 0.5, 'CV'
 else:
-    col, low, high, label = 'Z_score', -0.5, 0.5, 'Z‑score'
+    col, low, high, label = 'Z_score', -1, 1, 'Z‑score'
 
 # 7. 渲染地图
 if df.empty:
@@ -161,7 +161,7 @@ else:
 
     # 8. 页面输出
     st.header("Interactive Heatmap")
-    st_folium(m, width=800, height=800)
+    st_folium(m, width=1000, height=600)
 
     st.header("Monthly Mean Usage per Building")
     st.dataframe(monthly_mean)
