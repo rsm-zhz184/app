@@ -112,7 +112,7 @@ else:
 # 7) 绘制 Folium 地图，并**正确**把 CircleMarker 加到 m 上
 df_valid = df.dropna(subset=["Latitude","Longitude"])
 if df_valid.empty:
-    st.warning("✅ 这个分类下没有任何带坐标的建筑，无法显示热力图。")
+    st.warning("No Buildings Under Certain Classification")
     st.stop()
 
 center = [df_valid["Latitude"].mean(), df_valid["Longitude"].mean()]
@@ -159,4 +159,4 @@ if map_data and map_data.get("last_clicked"):
     df_valid["dist2"] = (df_valid["Latitude"]-lat)**2 + (df_valid["Longitude"]-lng)**2
     idx = df_valid["dist2"].idxmin()
     bld = df_valid.loc[idx, "Building"]
-    st.sidebar.success(f"🔍 最近点击的是：{bld}")
+    st.sidebar.success(f"🔍 Last_Clicked：{bld}")
