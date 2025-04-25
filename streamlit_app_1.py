@@ -128,7 +128,7 @@ for _, r in df_valid.iterrows():
     ).add_to(m)
     Popup(popup_html, max_width=300).add_to(marker)
 
-map_data = st_folium(m, width=900, height=500, returned_objects=["last_clicked"])
+map_data = st_folium(m, width=900, height=500, returned_objects=["last_clicked", "last_object_clicked"])
 
 # 9. Show monthly mean table
 st.header("📊 Monthly Mean Usage per Building")
@@ -144,7 +144,11 @@ show_dist = st.checkbox("Show distribution charts when marker clicked", value=Fa
 # ────────────────────────────────────────────────────────
 
 # 10. If clicked AND switch is on, draw distribution
-click = map_data.get("last_clicked") if map_data else None
+click = None
+if map_data.get("last_object_clicked"):
+    click = map_data["last_object_clicked"]
+elif map_data.get("last_clicked"):
+    click = map_data["last_clicked"]
 if show_dist and click:
     lat, lng = click["lat"], click["lng"]
     df_valid["dist2"] = (df_valid["Latitude"]-lat)**2 + (df_valid["Longitude"]-lng)**2
