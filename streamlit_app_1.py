@@ -26,7 +26,9 @@ commodity_map = {
     "Hot Water":        "HOTWATER",
     "Solar PV":         "SOLARPV",
     "ReClaimed Water":  "RECLAIMEDWATER",
-    "Chilled Water":    "CHILLEDWATER"
+    "Chilled Water":    "CHILLEDWATER",
+    'Water':            "WATER"
+    
 }
 
 # 3. Precompute CV & Z-score per building per utility
