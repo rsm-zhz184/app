@@ -34,7 +34,7 @@ st.markdown("---")
 # 4. 过滤 & 画图
 commodity_map = {
     "Electrical":"ELECTRIC","Gas":"NATURALGAS","Hot Water":"HOTWATER",
-    "Solar PV":"SOLARPV","ReClaimed Water":"RECLAIMEDWATER","Chilled Water":"CHILLEDWATER"
+    "Solar PV":"SOLARPV","ReClaimed Water":"RECLAIMEDWATER","Chilled Water":"CHILLEDWATER",'Water':'WATER'
 }
 code = commodity_map[utility]
 df = usage[(usage["Building"] == name) & (usage["CommodityCode"] == code)].copy()
