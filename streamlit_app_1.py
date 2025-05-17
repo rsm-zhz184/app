@@ -7,7 +7,7 @@ from streamlit_folium import st_folium
 import altair as alt
 from rapidfuzz import process
 
-# 1. Load & cache data
+# 1. Load data
 @st.cache_data
 def load_data():
     usage = pd.read_excel("data/Capstone 2025 Project- Utility Data copy.xlsx")
@@ -19,18 +19,23 @@ def load_data():
 
 usage_data, building_info, coordinates = load_data()
 
-# 2. Merge building info and coordinates
-usage_data['CAAN'] = usage_data['CAAN'].astype(str).str.strip()
-building_info['Building Capital Asset Account Number'] = building_info['Building Capital Asset Account Number'].astype(str).str.strip()
-usage_data = usage_data.merge(
-    building_info[['Building Capital Asset Account Number','Building','Building Classification']],
-    left_on='CAAN', right_on='Building Capital Asset Account Number', how='left'
-).drop(columns=['Building Capital Asset Account Number'])
+# 2. Preprocess data
+@st.cache_data
+def preprocess_data(usage_data, building_info, coordinates):
+    usage_data['CAAN'] = usage_data['CAAN'].astype(str).str.strip()
+    building_info['Building Capital Asset Account Number'] = building_info['Building Capital Asset Account Number'].astype(str).str.strip()
+    usage_data = usage_data.merge(
+        building_info[['Building Capital Asset Account Number','Building','Building Classification']],
+        left_on='CAAN', right_on='Building Capital Asset Account Number', how='left'
+    ).drop(columns=['Building Capital Asset Account Number'])
 
-usage_data = usage_data.merge(
-    coordinates[['Building Name','Latitude','Longitude']],
-    left_on='Building', right_on='Building Name', how='left'
-)
+    usage_data = usage_data.merge(
+        coordinates[['Building Name','Latitude','Longitude']],
+        left_on='Building', right_on='Building Name', how='left'
+    )
+    return usage_data
+
+usage_data = preprocess_data(usage_data, building_info, coordinates)
 
 # 3. Sidebar: fuzzy search + filters
 st.sidebar.header("🔍 Search or Filter")
@@ -61,16 +66,20 @@ classification = st.sidebar.selectbox("Classification", ["All"] + sorted(buildin
 show_dist = st.sidebar.checkbox("Show distribution charts", value=False)
 
 # 4. Prepare map data
-df_map = usage_data.copy()
-if matched_bld:
-    df_map = df_map[df_map['Building'] == matched_bld]
-else:
-    df_map = df_map[df_map['CommodityCode'] == commodity_map[utility]]
-    if classification != "All":
-        df_map = df_map[df_map['Building Classification'] == classification]
+@st.cache_data
+def prepare_map_data(usage_data, matched_bld, utility, classification):
+    df_map = usage_data.copy()
+    if matched_bld:
+        df_map = df_map[df_map['Building'] == matched_bld]
+    else:
+        df_map = df_map[df_map['CommodityCode'] == commodity_map[utility]]
+        if classification != "All":
+            df_map = df_map[df_map['Building Classification'] == classification]
+    df_map = df_map.dropna(subset=['Latitude', 'Longitude'])
+    center = [df_map['Latitude'].mean(), df_map['Longitude'].mean()] if not df_map.empty else [32.88, -117.23]
+    return df_map, center
 
-df_map = df_map.dropna(subset=['Latitude', 'Longitude'])
-center = [df_map['Latitude'].mean(), df_map['Longitude'].mean()]
+df_map, center = prepare_map_data(usage_data, matched_bld, utility, classification)
 
 # 5. Build map with folium markers
 m = folium.Map(location=center, zoom_start=15)
