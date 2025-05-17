@@ -104,6 +104,7 @@ elif map_data.get('last_object_clicked'):
     if popup_text:
         bld = popup_text.split("<br>")[0]
 
+
 if show_dist and bld:
     st.markdown("---")
     st.subheader(f"📈 Monthly Usage Trends for {bld}")
