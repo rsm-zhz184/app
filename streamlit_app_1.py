@@ -20,7 +20,6 @@ def load_data():
 usage_data, building_info, coordinates = load_data()
 
 # 2. Preprocess data
-@st.cache_data
 def preprocess_data(usage_data, building_info, coordinates):
     usage_data['CAAN'] = usage_data['CAAN'].astype(str).str.strip()
     building_info['Building Capital Asset Account Number'] = building_info['Building Capital Asset Account Number'].astype(str).str.strip()
@@ -66,7 +65,6 @@ classification = st.sidebar.selectbox("Classification", ["All"] + sorted(buildin
 show_dist = st.sidebar.checkbox("Show distribution charts", value=False)
 
 # 4. Prepare map data
-@st.cache_data
 def prepare_map_data(usage_data, matched_bld, utility, classification):
     df_map = usage_data.copy()
     if matched_bld:
