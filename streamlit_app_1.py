@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import folium
 from folium import Popup
+from folium.plugins import Search
 from streamlit_folium import st_folium
 import altair as alt
 
@@ -19,7 +20,17 @@ def load_data():
 
 usage_data, building_info, coordinates = load_data()
 
-# 2. Utility → CommodityCode map
+# 2. Merge Building Name via CAAN
+usage_data['CAAN'] = usage_data['CAAN'].astype(str).str.strip()
+building_info['Building Capital Asset Account Number'] = (
+    building_info['Building Capital Asset Account Number'].astype(str).str.strip()
+)
+usage_data = usage_data.merge(
+    building_info[['Building Capital Asset Account Number','Building']],
+    left_on='CAAN', right_on='Building Capital Asset Account Number', how='left'
+).drop(columns=['Building Capital Asset Account Number'])
+
+# 3. Precompute CV & Z-score maps (for sidebar filters if needed)
 commodity_map = {
     "Electrical":       "ELECTRIC",
     "Gas":              "NATURALGAS",
@@ -28,150 +39,97 @@ commodity_map = {
     "ReClaimed Water":  "RECLAIMEDWATER",
     "Chilled Water":    "CHILLEDWATER",
     'Water':            "WATER"
-    
 }
-
-# 3. Precompute CV & Z-score per building per utility
 @st.cache_data
 def compute_cv_maps():
     cv_maps = {}
     for util, code in commodity_map.items():
         df = usage_data[usage_data["CommodityCode"] == code].copy()
         df = df.merge(
-            building_info[["Building Capital Asset Account Number","Building","Building Classification"]],
-            left_on="CAAN", right_on="Building Capital Asset Account Number",
-            how="left"
+            building_info[['Building','Building Classification']], on='Building', how='left'
         ).merge(
-            coordinates[["Building Name","Latitude","Longitude"]],
-            left_on="Building", right_on="Building Name",
-            how="left"
+            coordinates[['Building Name','Latitude','Longitude']],
+            left_on='Building', right_on='Building Name', how='left'
         )
-        df["Year"] = df["EndDate"].dt.year
-        annual = df.groupby(["Building","Year"])["Use"].sum().reset_index()
-        cv_df = annual.groupby("Building")["Use"] \
-                      .agg(["mean","std"]).reset_index() \
-                      .rename(columns={"mean":"Mean","std":"Std"})
-        cv_df["Use_CV"] = cv_df["Std"] / cv_df["Mean"]
+        df['Year'] = df['EndDate'].dt.year
+        annual = df.groupby(['Building','Year'])['Use'].sum().reset_index()
+        cv_df = (annual.groupby('Building')['Use']
+                 .agg(['mean','std']).reset_index()
+                 .rename(columns={'mean':'Mean','std':'Std'})
+        )
+        cv_df['Use_CV'] = cv_df['Std'] / cv_df['Mean']
         cv_df = cv_df.merge(
-            building_info[["Building","Building Classification"]],
-            on="Building", how="left"
+            building_info[['Building','Building Classification']], on='Building', how='left'
         ).merge(
-            coordinates[["Building Name","Latitude","Longitude"]],
-            left_on="Building", right_on="Building Name", how="left"
+            coordinates[['Building Name','Latitude','Longitude']],
+            left_on='Building', right_on='Building Name', how='left'
         )
-        cv_df["Z_score"] = cv_df.groupby("Building Classification")["Use_CV"] \
-                                 .transform(lambda x: (x - x.mean())/x.std())
+        cv_df['Z_score'] = cv_df.groupby('Building Classification')['Use_CV'] \
+                             .transform(lambda x: (x - x.mean())/x.std())
         cv_maps[util] = cv_df
     return cv_maps
 
 cv_maps = compute_cv_maps()
-all_classes = sorted(building_info["Building Classification"].dropna().unique())
 
-# 4. Page & sidebar
-st.set_page_config(page_title="Campus Heatmap", layout="wide")
-st.title("📍 Campus Heatmap")
+# 4. Sidebar settings (Utility/Classification) + Distribution toggle
 st.sidebar.header("🔧 Settings")
-utility       = st.sidebar.selectbox("Utility", list(cv_maps.keys()))
-classification = st.sidebar.selectbox("Classification", ["All"] + all_classes)
-compare_mode  = st.sidebar.selectbox("Compare to", ["Self", "Same classification"])
-
-# 5. Filter CV data by classification
-df = cv_maps[utility].copy()
-if classification != "All":
-    df = df[df["Building Classification"] == classification]
-
-# If no data after filtering, stop
-if df.empty:
-    st.error(f"❌ Current “{classification}” has no data")
-    st.stop()
-
-# 6. Compute monthly totals & mean
-u = usage_data[usage_data["CommodityCode"] == commodity_map[utility]].copy()
-u = u.merge(
-    building_info[["Building Capital Asset Account Number","Building","Building Classification"]],
-    left_on="CAAN", right_on="Building Capital Asset Account Number", how="left"
-).merge(
-    coordinates[["Building Name","Latitude","Longitude"]],
-    left_on="Building", right_on="Building Name", how="left"
+utility       = st.sidebar.selectbox("Utility", list(commodity_map.keys()))
+classification = st.sidebar.selectbox(
+    "Classification", ["All"] + sorted(building_info['Building Classification'].dropna().unique())
 )
-if classification != "All":
-    u = u[u["Building Classification"] == classification]
-u["Month"] = u["EndDate"].dt.to_period("M")
-monthly = u.groupby(["Building","Month"])["Use"].sum().reset_index(name="Monthly_Total")
-monthly_mean = monthly.groupby("Building")["Monthly_Total"].mean().reset_index(name="Monthly_Mean")
-df = df.merge(monthly_mean, on="Building", how="left")
+show_dist     = st.sidebar.checkbox("Show distribution charts", value=False)
 
-# 7. Select metric
-if compare_mode == "Self":
-    col, low, high, label = "Use_CV", 0.3, 0.5, "CV"
+# 5. Prepare df_map according to filters
+#    If no search, default: filtered by utility + classification
+if utility:
+    df_map = cv_maps[utility]
+    if classification != "All":
+        df_map = df_map[df_map['Building Classification'] == classification]
 else:
-    col, low, high, label = "Z_score", -1, 1, "Z-score"
-df_valid = df.dropna(subset=["Latitude","Longitude"])
+    df_map = usage_data.merge(
+        building_info[['Building','Building Classification']], on='Building', how='left'
+    ).merge(
+        coordinates[['Building Name','Latitude','Longitude']],
+        left_on='Building', right_on='Building Name', how='left'
+    )
 
-# 8. Draw Folium map
-center = [df_valid["Latitude"].mean(), df_valid["Longitude"].mean()]
+# drop null coords
+df_map = df_map.dropna(subset=['Latitude','Longitude'])
+
+# 6. Build Folium map with Search plugin
+center = [df_map['Latitude'].mean(), df_map['Longitude'].mean()]
 m = folium.Map(location=center, zoom_start=15)
-for _, r in df_valid.iterrows():
-    v = r[col]
-    color = "red" if v>high else "orange" if v>low else "green"
-    mon_str = f"{r['Monthly_Mean']:.2f}" if pd.notna(r["Monthly_Mean"]) else "N/A"
-    popup_html = f"""
-    <div style='font-size:14px;text-align:center;'>
-      <b>{r['Building']}</b><br>
-      🏷️ <i>{r['Building Classification']}</i><br><br>
-      📊 {label}: <span style='color:{color};font-weight:bold;'>{v:.2f}</span><br>
-      📈 Avg Monthly: <b>{mon_str}</b>
-    </div>
-    """
-    marker = folium.CircleMarker(
-        location=[r["Latitude"],r["Longitude"]],
-        radius=6, color="black",
-        fill=True, fill_color=color, fill_opacity=0.8
-    ).add_to(m)
-    Popup(popup_html, max_width=300).add_to(marker)
+fg = folium.FeatureGroup(name='buildings').add_to(m)
+for _, r in df_map.iterrows():
+    folium.Marker(
+        location=[r['Latitude'], r['Longitude']],
+        popup=r['Building'],
+        icon=folium.Icon(color='blue', icon='info-sign')
+    ).add_to(fg)
+Search(
+    layer=fg,
+    search_label='popup',
+    placeholder='Search building... (type and select)',
+    collapsed=False,
+    position='topleft'
+).add_to(m)
+map_data = st_folium(m, width=900, height=500)
 
-map_data = st_folium(m, width=900, height=500, returned_objects=["last_clicked", "last_object_clicked"])
-
-# 9. Show monthly mean table
-st.header("📊 Monthly Mean Usage per Building")
-st.dataframe(
-    monthly_mean.rename(columns={"Monthly_Mean":"Avg Monthly Use"})
-                 .sort_values("Avg Monthly Use", ascending=False)
-                 .reset_index(drop=True),
-    use_container_width=True
-)
-
-# ─── 新增开关 ────────────────────────────────────────────
-show_dist = st.checkbox("Show distribution charts when marker clicked", value=False)
-# ────────────────────────────────────────────────────────
-
-# 10. If clicked AND switch is on, draw distribution
-click = None
-if map_data.get("last_object_clicked"):
-    click = map_data["last_object_clicked"]
-elif map_data.get("last_clicked"):
-    click = map_data["last_clicked"]
-if show_dist and click:
-    lat, lng = click["lat"], click["lng"]
-    df_valid["dist2"] = (df_valid["Latitude"]-lat)**2 + (df_valid["Longitude"]-lng)**2
-    bld = df_valid.loc[df_valid["dist2"].idxmin(), "Building"]
-
-    sel = monthly[monthly["Building"] == bld].copy()
-    sel["Month"] = sel["Month"].dt.to_timestamp()
-
-    st.markdown("---")
-    st.subheader(f"📈 Monthly Usage Trend for {bld}")
-    line = alt.Chart(sel).mark_line(point=True).encode(
-        x="Month:T", y="Monthly_Total:Q",
-        tooltip=["Month","Monthly_Total"]
-    ).properties(width=800, height=300)
-    st.altair_chart(line, use_container_width=True)
-
-    st.subheader("📊 Yearly Usage Totals")
-    sel["Year"] = sel["Month"].dt.year
-    yearly = sel.groupby("Year")["Monthly_Total"].sum().reset_index()
-    bar = alt.Chart(yearly).mark_bar().encode(
-        x="Year:O", y="Monthly_Total:Q",
-        tooltip=["Year","Monthly_Total"]
-    ).properties(width=800, height=300)
-    st.altair_chart(bar, use_container_width=True)
+# 7. Show distribution charts below map on marker click or after search selection
+if show_dist and map_data.get('last_object_clicked'):
+    props = map_data['last_object_clicked'].get('properties', {})
+    bld = props.get('popup') or props.get('building')
+    if bld:
+        st.markdown("---")
+        st.subheader(f"📈 All Utilities Monthly Trend for {bld}")
+        for util, code in commodity_map.items():
+            sub = usage_data[(usage_data['Building'] == bld) & 
+                              (usage_data['CommodityCode'] == code)].copy()
+            if sub.empty:
+                continue
+            sub['Month'] = sub['EndDate'].dt.to_period('M').dt.to_timestamp()
+            monthly = sub.groupby('Month')['Use'].sum().reset_index()
+            line = alt.Chart(monthly).mark_line(point=True).encode(
+                x='Month:T', y='Use:Q', tooltip=['Month','Use']
+            ).properties(width=250, height=150, title=util)
+            st.altair_chart(line, use_container_width=False)
