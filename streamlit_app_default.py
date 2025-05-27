@@ -174,4 +174,4 @@ if show_dist and click:
         x="Year:O", y="Monthly_Total:Q",
         tooltip=["Year","Monthly_Total"]
     ).properties(width=800, height=300)
-    st.altair_chart(bar, use_container_width=True)我正在streamlit上实现可视化，先理解一下我的代码的框架
+    st.altair_chart(bar, use_container_width=True)
